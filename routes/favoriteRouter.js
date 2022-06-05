@@ -5,8 +5,6 @@ const Favorite = require('../models/favorite');
 
 const favoriteRouter = express.Router();
 
-favoriteRouter.use(bodyParser.json());
-
 favoriteRouter.route('/')
 .options(cors.corsWithOptions, (req, res) => res.sendStatus(200))
 .get(cors.cors, (req, res, next) => {
@@ -58,7 +56,7 @@ favoriteRouter.route('/')
   res.end(`PUT operation not supported on /favorites`);
 })
 .delete(cors.corsWithOptions, authenticate.verifyUser, (req, res, next) => {
-  Favorite.findOneAndRemove({user: req.user._id})
+  Favorite.findOneAndDelete({user: req.user._id})
   .then(favorites => {
     res.statusCode = 200;
     res.setHeader('Content-Type', 'text/plain');
@@ -107,13 +105,33 @@ favoriteRouter.route('/:campsiteId')
     res.end(`PUT operation not supported on /favorites/${req.params.campsiteId}`);
   })
   .delete(cors.corsWithOptions, authenticate.verifyUser, (req, res, next) => {
-    Favorite.findByIdAndDelete(req.params.favoriteId)
-    .then(response => {
-        res.statusCode = 200;
-        res.setHeader('Content-Type', 'application/json');
-        res.json(response);
-    })
-    .catch(err => next(err));
+    Favorites.findOne({user: req.user._id})
+    .then((favorite) => {
+        if (favorite) {            
+            index = favorite.campsite.indexOf(req.params.campsiteId);
+            if (index >= 0) {
+                favorite.campsite.splice(index, 1);
+                favorite.save()
+                .then((favorite) => {
+                    console.log('Favorite Deleted ', favorite);
+                    res.statusCode = 200;
+                    res.setHeader('Content-Type', 'application/json');
+                    res.json(favorite);
+                }, (err) => next(err));
+            }
+            else {
+                err = new Error('Campsite ' + req.params.campsiteId + ' not found');
+                err.status = 404;
+                return next(err);
+            }
+        }
+        else {
+            err = new Error('Favorites not found');
+            err.status = 404;
+            return next(err);
+        }
+    }, (err) => next(err))
+    .catch((err) => next(err));
 });
 
 
